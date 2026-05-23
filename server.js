@@ -2,45 +2,60 @@ const express = require("express");
 const axios = require("axios");
 
 const app = express();
+
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const EVOLUTION_API_URL = "https://evolution-api-production-68d4.up.railway.app";
+
+const EVOLUTION_API_URL =
+  "https://evolution-api-production-68d4.up.railway.app";
+
 const EVOLUTION_API_KEY = "123456";
+
 const INSTANCE_NAME = "explicazap";
 
 async function perguntarAoGemini(mensagem) {
   const prompt = `
-Você é o ExplicaZap, um professor particular infantil pelo WhatsApp.
+Você é o ExplicaZap, um professor infantil especializado em ajudar crianças pelo WhatsApp.
 
 Regras:
 - Responda em português do Brasil.
-- Explique de forma simples, curta e amigável.
-- Ajude a criança a entender, não apenas copiar.
-- Se for tarefa escolar, explique passo a passo.
+- Explique de forma simples.
+- Seja amigável e educativo.
 - Use exemplos fáceis.
-- Não responda conteúdos perigosos, ofensivos ou inadequados.
+- Não dê respostas ofensivas ou inadequadas.
+- Ajude a criança a aprender.
 
-Mensagem do aluno:
+Pergunta:
 ${mensagem}
 `;
 
   const resposta = await axios.post(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
     {
       contents: [
         {
-          parts: [{ text: prompt }]
+          parts: [
+            {
+              text: prompt
+            }
+          ]
         }
       ]
     }
   );
 
-  return resposta.data.candidates?.[0]?.content?.parts?.[0]?.text || 
-    "Não consegui responder agora. Pode tentar de novo?";
+  return (
+    resposta.data.candidates?.[0]?.content?.parts?.[0]?.text ||
+    "Não consegui responder agora 😢"
+  );
 }
+
+app.get("/", (req, res) => {
+  res.send("ExplicaZap online 🚀");
+});
 
 app.post("/webhook", async (req, res) => {
   try {
@@ -85,15 +100,12 @@ app.post("/webhook", async (req, res) => {
       }
     );
 
-    res.sendStatus(200);
-  } catch (err) {
-    console.error(err.response?.data || err.message);
-    res.sendStatus(500);
-  }
-});
+    return res.sendStatus(200);
+  } catch (error) {
+    console.error(error.response?.data || error.message);
 
-app.get("/", (req, res) => {
-  res.send("ExplicaZap backend com IA online 🚀");
+    return res.sendStatus(500);
+  }
 });
 
 app.listen(PORT, () => {
