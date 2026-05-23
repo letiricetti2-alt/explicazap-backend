@@ -6,11 +6,44 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const EVOLUTION_API_URL = "https://evolution-api-production-68d4.up.railway.app";
+const EVOLUTION_API_KEY = "123456";
+const INSTANCE_NAME = "explicazap";
+
+async function perguntarAoGemini(mensagem) {
+  const prompt = `
+Você é o ExplicaZap, um professor particular infantil pelo WhatsApp.
+
+Regras:
+- Responda em português do Brasil.
+- Explique de forma simples, curta e amigável.
+- Ajude a criança a entender, não apenas copiar.
+- Se for tarefa escolar, explique passo a passo.
+- Use exemplos fáceis.
+- Não responda conteúdos perigosos, ofensivos ou inadequados.
+
+Mensagem do aluno:
+${mensagem}
+`;
+
+  const resposta = await axios.post(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+    {
+      contents: [
+        {
+          parts: [{ text: prompt }]
+        }
+      ]
+    }
+  );
+
+  return resposta.data.candidates?.[0]?.content?.parts?.[0]?.text || 
+    "Não consegui responder agora. Pode tentar de novo?";
+}
+
 app.post("/webhook", async (req, res) => {
   try {
-    console.log("Mensagem recebida:");
-    console.log(JSON.stringify(req.body, null, 2));
-
     const evento = req.body.event;
 
     if (evento !== "messages.upsert") {
@@ -24,22 +57,29 @@ app.post("/webhook", async (req, res) => {
     }
 
     const numero = data.key.remoteJid.replace("@s.whatsapp.net", "");
+
     const mensagem =
       data.message?.conversation ||
       data.message?.extendedTextMessage?.text ||
       "";
 
-    console.log(`Mensagem de ${numero}: ${mensagem}`);
+    if (!mensagem) {
+      return res.sendStatus(200);
+    }
+
+    console.log(`Mensagem recebida de ${numero}: ${mensagem}`);
+
+    const respostaIA = await perguntarAoGemini(mensagem);
 
     await axios.post(
-      "https://evolution-api-production-68d4.up.railway.app/message/sendText/explicazap",
+      `${EVOLUTION_API_URL}/message/sendText/${INSTANCE_NAME}`,
       {
         number: numero,
-        text: `Você disse: ${mensagem}`
+        text: respostaIA
       },
       {
         headers: {
-          apikey: "123456",
+          apikey: EVOLUTION_API_KEY,
           "Content-Type": "application/json"
         }
       }
@@ -53,7 +93,7 @@ app.post("/webhook", async (req, res) => {
 });
 
 app.get("/", (req, res) => {
-  res.send("Backend online 🚀");
+  res.send("ExplicaZap backend com IA online 🚀");
 });
 
 app.listen(PORT, () => {
